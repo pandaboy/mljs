@@ -8,11 +8,11 @@ var Node = function(object) {
 
 Node.prototype.measureDistances = function(area_range_obj, rooms_range_obj) {
   var rooms_range = rooms_range_obj.max - rooms_range_obj.min;
-  var area_range = area_range_obj.max - area_range_obj.min;
+  var area_range  = area_range_obj.max - area_range_obj.min;
 
   for(var i in this.neighbours)
   {
-    var neighbour = this.neighbour[i];
+    var neighbour = this.neighbours[i];
 
     var delta_rooms = neighbour.rooms - this.rooms;
     delta_rooms = (delta_rooms) / rooms_range;
@@ -48,7 +48,7 @@ Node.prototype.guessType = function(k) {
 
   for ( var type in types ) {
     if(types[type] > guess.count) {
-      guess.type = type;
+      guess.type  = type;
       guess.count = types[type];
     }
   }
@@ -83,17 +83,17 @@ NodeList.prototype.calculateRanges = function() {
       this.rooms.max = this.nodes[i].rooms;
     }
 
-    if(this.nodes[i].areas > this.areas.max) {
+    if(this.nodes[i].area > this.areas.max) {
       this.areas.max = this.nodes[i].area;
     }
 
-    if(this.nodes[i].areas < this.areas.min) {
+    if(this.nodes[i].area < this.areas.min) {
       this.areas.min = this.nodes[i].area;
     }
   }
 };
 
-NodeList.prototype.determineUknown = function() {
+NodeList.prototype.determineUnknown = function() {
   this.calculateRanges();
 
   /*
@@ -122,4 +122,136 @@ NodeList.prototype.determineUknown = function() {
       console.log( this.nodes[i].guessType(this.k));
     }
   }
+};
+
+NodeList.prototype.draw = function(canvas_id) {
+  var rooms_range = this.rooms.max - this.rooms.min;
+  var area_range  = this.areas.max - this.areas.min;
+
+  var canvas = document.getElementById(canvas_id);
+  var ctx    = canvas.getContext('2d');
+  var width  = 400;
+  var height = 400;
+
+  ctx.clearRect(0, 0, width, height);
+
+  for ( var i in this.nodes ) {
+    ctx.save();
+
+    switch(this.nodes[i].type)
+    {
+      case 'apartment':
+        ctx.fillStyle = 'red';
+        break;
+
+      case 'house':
+        ctx.fillStyle = 'green';
+        break;
+
+      case 'flat':
+        ctx.fillStyle = 'blue';
+        break;
+
+      default:
+        ctx.fillStyle = '#666666';
+    }
+
+    var padding = 40;
+
+    var x_shift_pct = (width - padding) / width;
+    var y_shift_pct = (height - padding) / height;
+
+    var x = (this.nodes[i].rooms - this.rooms.min) * (width / rooms_range) * x_shift_pct + (padding/2);
+    var y = (this.nodes[i].area - this.areas.min) * (height / area_range) * y_shift_pct + (padding/2);
+    y = Math.abs(y - height);
+
+    ctx.translate(x, y);
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI*2, true);
+    ctx.fill();
+    ctx.closePath();
+
+    // if this is an unknown node, draw the radius of influence
+    if (!this.nodes[i].type) {
+      switch(this.nodes[i].guess.type)
+      {
+        case 'apartment':
+          ctx.strokeStyle = 'red';
+          break;
+
+        case 'house':
+          ctx.strokeStyle = 'green';
+          break;
+
+        case 'flat':
+          ctx.strokeStyle = 'blue';
+          break;
+
+        default:
+          ctx.strokeStyle = '#666666';
+      }
+
+      var radius = this.nodes[i].neighbours[this.k - 1].distance * width;
+
+      radius *= x_shift_pct;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2, true);
+      ctx.stroke();
+      ctx.closePath();
+    }
+
+    ctx.restore();
+  }
+};
+
+var nodes;
+
+var data = [
+    {rooms: 1, area: 350, type: 'apartment'},
+    {rooms: 2, area: 300, type: 'apartment'},
+    {rooms: 3, area: 300, type: 'apartment'},
+    {rooms: 4, area: 250, type: 'apartment'},
+    {rooms: 4, area: 500, type: 'apartment'},
+    {rooms: 4, area: 400, type: 'apartment'},
+    {rooms: 5, area: 450, type: 'apartment'},
+
+    {rooms: 7,  area: 850,  type: 'house'},
+    {rooms: 7,  area: 900,  type: 'house'},
+    {rooms: 7,  area: 1200, type: 'house'},
+    {rooms: 8,  area: 1500, type: 'house'},
+    {rooms: 9,  area: 1300, type: 'house'},
+    {rooms: 8,  area: 1240, type: 'house'},
+    {rooms: 10, area: 1700, type: 'house'},
+    {rooms: 9,  area: 1000, type: 'house'},
+
+    {rooms: 1, area: 800,  type: 'flat'},
+    {rooms: 3, area: 900,  type: 'flat'},
+    {rooms: 2, area: 700,  type: 'flat'},
+    {rooms: 1, area: 900,  type: 'flat'},
+    {rooms: 2, area: 1150, type: 'flat'},
+    {rooms: 1, area: 1000, type: 'flat'},
+    {rooms: 2, area: 1200, type: 'flat'},
+    {rooms: 1, area: 1300, type: 'flat'},
+];
+
+var run = function(){
+  nodes = new NodeList(3);
+
+  for(var i in data) {
+    nodes.add(new Node(data[i]));
+  }
+
+  var random_rooms = Math.round( Math.random() * 10 );
+  var random_area  = Math.round( Math.random() * 2000 );
+
+  nodes.add( new Node({rooms: random_rooms, area: random_area, type: false }));
+
+  nodes.determineUnknown();
+  nodes.draw("canvas");
+};
+
+window.onload = function(){
+  setInterval(run, 5000);
+  run();
 };
